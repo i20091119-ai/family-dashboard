@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "family-dashboard",
+  // 포켓퀴즈와 같은 Cloudflare 계정
+  "account_id": "3baf945a4393bacb79ceacb36bd1d792",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-05-15",
+  "keep_vars": true,
+  "assets": { "directory": "public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/hook/*"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "family-dashboard-db",
+      // GitHub 자동 작업이 올릴 때 채웁니다
+      "database_id": "00000000-0000-4000-8000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
