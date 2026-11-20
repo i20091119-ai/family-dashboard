@@ -1,6 +1,7 @@
 // 거실 가족 대시보드 화면.
 // 평일 07:30–08:30 아침 출발 도우미, 17:00–22:00 홈, 그 외 어두운 화면(터치하면 1분 켜짐).
 import { iGa } from '../shared/village.ts';
+import { dustLevel, emojiAt } from '../shared/weather.ts';
 import { DOW, HAJUN_STEPS, kstOf, modeAt, MORNING, MORNING_STEPS, msOfKst, parseHm, type Mode, type Who } from '../shared/time.ts';
 import { ApiError, call, device } from './api.ts';
 import type { State, Todo } from './types.ts';
@@ -78,6 +79,29 @@ function renderSimBand() {
   band.textContent = `🧪 시험 중 · ${n.date} (${DOW[n.weekday]}) ${n.time.slice(0, 5)}${device.pqPlayer === 'sim' ? ' · 포켓퀴즈 시험용 기록' : ''}`;
 }
 
+// ---------- 하늘 띠 (시계·날짜·날씨) ----------
+function skyBar(): string {
+  const n = now();
+  const w = state!.weather;
+  const h = Math.floor(n.minutes / 60), mm = String(n.minutes % 60).padStart(2, '0');
+  const ampm = h < 12 ? '오전' : '오후', h12 = h % 12 === 0 ? 12 : h % 12;
+  const date = `${Number(n.date.slice(5, 7))}월 ${Number(n.date.slice(8))}일 ${DOW[n.weekday]}요일`;
+  let weather = '';
+  if (w) {
+    const nowKey = `${n.date}T${String(h).padStart(2, '0')}`;
+    const later = w.hours.filter(x => x.at.slice(0, 13) > nowKey);
+    const picks = [0, 3, 6, 9].map(i => later[i]).filter(Boolean);
+    const dust = w.dust ? dustLevel(w.dust.pm10, w.dust.pm25) : null;
+    weather = `<div class="w-now"><span class="w-emoji">${emojiAt(w.code, h)}</span><b class="w-temp">${w.temp}°</b>
+        <div class="w-sub"><b>${esc(w.text)}</b><small>최고 ${w.max}° · 최저 ${w.min}°</small></div></div>
+      ${dust ? `<div class="w-dust lv${dust.level}"><small>미세먼지</small><span>${dust.face}</span><b>${dust.text}</b></div>` : ''}
+      <div class="w-hours">${picks.map(x => { const hh = Number(x.at.slice(11, 13)); return `<span><small>${hh}시</small><i>${emojiAt(x.code, hh)}</i><b>${x.temp}°</b>${x.rain ? `<em>💧${x.rain}%</em>` : '<em></em>'}</span>`; }).join('')}</div>
+      ${w.tip ? `<div class="w-tip"><b>나갈 때</b> ${esc(w.tip)}</div>` : ''}`;
+  }
+  return `<div class="sky-time"><div class="sky-date">${date}</div><div class="sky-clock"><small>${ampm}</small><b>${h12}</b><i>:</i><b>${mm}</b></div></div>
+    <div class="sky-weather">${weather}</div>`;
+}
+
 // ---------- 아침 출발 도우미 ----------
 function renderMorning() {
   const s = state!;
@@ -90,25 +114,28 @@ function renderMorning() {
   const nextSeojun = MORNING_STEPS.find(st => !tapOf('seojun', st.key));
   const leftToDoor = Math.max(0, Math.ceil(parseHm('08:28') - nowMin));
   // 버튼은 바뀔 때만 다시 그림 (누르는 중에 버튼이 바뀌어 눌림이 사라지지 않게). 시계·막대는 매초
-  const key = JSON.stringify([s.morning.taps, partnerImg, nextSeojun?.key, leftToDoor, n.minutes]);
+  const key = JSON.stringify([s.morning.taps, partnerImg, nextSeojun?.key, leftToDoor, n.minutes, s.weather?.at]);
   if (app.classList.contains('morning') && app.dataset.key === key) {
     $('.bar-fill', app).style.width = `${pct(nowMin)}%`;
     $('.bar-now', app).style.left = `${pct(nowMin)}%`;
+    $('.sky', app).innerHTML = skyBar();
     return;
   }
   app.dataset.key = key;
   app.className = 'screen morning';
+  const partnerPx = s.pq?.partner?.image.art ?? '';
   app.innerHTML = `
-    <header class="m-head">
-      <div class="m-clock">${n.time.slice(0, 5)}</div>
-      <div class="m-title">아침 출발! <small>${leftToDoor > 0 ? `현관까지 <b>${leftToDoor}분</b>` : '현관으로 출발! 🚪'}</small></div>
-      <button class="gear" aria-label="설정">⚙️</button>
-    </header>
-    <section class="bar" aria-label="시간 막대">
-      <div class="bar-track"><div class="bar-fill" style="width:${pct(nowMin)}%"></div></div>
-      <div class="bar-now" style="left:${pct(nowMin)}%"><span>${n.time.slice(0, 5)}</span></div>
-      <div class="bar-mark start" style="left:0"><b>07:30</b></div>
-      ${MORNING_STEPS.map(st => `<div class="bar-mark ${nowMin >= parseHm(st.until) ? 'past' : ''}" style="left:${pct(parseHm(st.until))}%"><i></i><b>${st.until}</b><span>${st.emoji}</span></div>`).join('')}
+    <header class="sky">${skyBar()}</header>
+    <button class="gear" aria-label="설정">⚙️</button>
+    <section class="bar-card">
+      <div class="bar-title">${leftToDoor > 0 ? `현관까지 <b>${leftToDoor}분</b> 남았어요` : '현관으로 출발! 🚪'}</div>
+      <div class="bar">
+        <div class="bar-track"><div class="bar-fill" style="width:${pct(nowMin)}%"></div></div>
+        <div class="bar-now" style="left:${pct(nowMin)}%">${partnerPx ? `<img src="${esc(partnerPx)}" alt="">` : ''}<span>같이 준비하자!</span></div>
+        <div class="bar-mark start" style="left:0"><b>07:30</b></div>
+        ${MORNING_STEPS.map(st => `<div class="bar-mark ${nowMin >= parseHm(st.until) ? 'past' : ''}" style="left:${pct(parseHm(st.until))}%"><i></i><b>${st.until}</b><span>${st.emoji}</span></div>`).join('')}
+        <div class="bar-door">🚪</div>
+      </div>
     </section>
     <section class="row seojun">
       <div class="who">${partnerImg ? `<img src="${esc(partnerImg)}" alt="">` : '⭐'}<span>서준</span></div>
@@ -157,43 +184,41 @@ document.addEventListener('pointerdown', () => {
 }, true);
 
 // ---------- 홈 ----------
+// 마을이 화면 전체(빈칸 없음), 그 위에 하늘 띠·버튼·창·카드가 떠 있음
 function renderHome() {
   const s = state!;
-  const n = now();
   const pq = s.pq;
   const guests = pq?.village.guests ?? [];
   const g = guests[0];
-  const guestLine = g ? `오늘 <b>${esc(g.name)}</b>${guests.length > 1 ? ` 외 ${guests.length - 1}마리가` : iGa(g.name)} 놀러 왔어! ${pq?.dailyMission.done ? '폰에서 말 걸어 봐' : '미션 끝내고 말 걸어 봐'}` : '';
-  const w = s.weather;
+  const guestLine = g ? `<img src="${esc(g.image.pixel)}" alt=""><span>오늘 <b>${esc(g.name)}</b>${guests.length > 1 ? ` 외 ${guests.length - 1}마리가` : iGa(g.name)} 놀러 왔어! ${pq?.dailyMission.done ? '폰에서 말 걸어 봐' : '미션 끝내고 말 걸어 봐'}</span>` : '';
   if (!app.classList.contains('home')) {
     app.className = 'screen home';
     app.innerHTML = `
-      <header class="top">
-        <div class="clock"></div><div class="date"></div><div class="weather"></div>
-        <button class="gear" aria-label="설정">⚙️<i class="dot"></i></button>
-      </header>
-      <main class="village-wrap">
-        <div class="village" aria-hidden="true"></div>
+      <div class="village" aria-hidden="true"></div>
+      <div class="overlay">
+        <header class="sky"></header>
         <nav class="buttons">
           <button data-pop="schedule"><span>📅</span>가족 일정</button>
           <button data-pop="todo"><span>📝</span>할 일·장보기</button>
           <button data-pop="seojun"><span>⭐</span>서준이 집</button>
           <button data-pop="hajun"><span>🌱</span>하준이 집</button>
         </nav>
-        <p class="guest-line"></p>
-        <aside class="training"></aside>
-      </main>`;
-    app.querySelectorAll<HTMLButtonElement>('[data-pop]').forEach(b => { b.onclick = () => openPopup(b.dataset.pop!); });
+        <div class="pop-slot"></div>
+        <footer class="bottom"><p class="guest-line"></p><aside class="training"></aside></footer>
+      </div>
+      <button class="gear" aria-label="설정">⚙️<i class="dot"></i></button>`;
+    app.querySelectorAll<HTMLButtonElement>('[data-pop]').forEach(b => { b.onclick = () => (popKind === b.dataset.pop ? closePopup() : openPopup(b.dataset.pop!)); });
     $('.gear', app).onclick = () => openAdmin();
   }
-  $('.clock', app).textContent = n.time.slice(0, 5);
-  $('.date', app).textContent = `${Number(n.date.slice(5, 7))}월 ${Number(n.date.slice(8))}일 ${DOW[n.weekday]}요일`;
-  $('.weather', app).innerHTML = w ? `${w.emoji} <b>${w.temp}°</b> <small>${w.min}° / ${w.max}°${w.rain !== null && w.rain >= 30 ? ` · ☔ ${w.rain}%` : ''}</small>` : '';
+  $('.sky', app).innerHTML = skyBar();
   $('.gear .dot', app).hidden = !s.school.warning.warn;
+  app.querySelectorAll<HTMLButtonElement>('[data-pop]').forEach(b => b.classList.toggle('on', b.dataset.pop === popKind));
   const gl = $('.guest-line', app);
-  gl.innerHTML = guestLine; gl.hidden = !guestLine;
+  if (gl.dataset.html !== guestLine) { gl.innerHTML = guestLine; gl.dataset.html = guestLine; }
+  gl.hidden = !guestLine;
   const tr = $('.training', app);
-  tr.innerHTML = pq ? trainingMini(pq.training) : `<small>${esc(s.pqError ?? '')}</small>`;
+  const th = pq ? trainingMini(pq.training) + `<p class="t-cheer">${pq.training.reached ? '이번 주 목표 달성! 💎' : `${Math.max(0, pq.training.goal - pq.training.score)}개 남았어! 힘내`}</p>` : `<small>${esc(s.pqError ?? '')}</small>`;
+  if (tr.dataset.html !== th) { tr.innerHTML = th; tr.dataset.html = th; }
   const vEl = $('.village', app);
   if (pq) renderVillage(vEl, pq, s.pqBase);
   else vEl.innerHTML = `<div class="village-empty">🏡<br><small>${esc(s.pqError ?? '포켓몬 마을을 불러오는 중…')}</small></div>`;
@@ -210,19 +235,23 @@ let popTimer = 0;
 let popKind: string | null = null;
 let todoTab: 'todo' | 'shop' = 'todo';
 let todoBy: string | null = null;
-function closePopup() { $('#popup')?.remove(); window.clearTimeout(popTimer); popKind = null; }
+function closePopup() { $('#popup')?.remove(); window.clearTimeout(popTimer); popKind = null; app.querySelectorAll('[data-pop]').forEach(b => b.classList.remove('on')); }
 function bumpPopup() { window.clearTimeout(popTimer); popTimer = window.setTimeout(closePopup, POPUP_MS); }
+const POP_TITLE: Record<string, string> = { schedule: '📅 가족 일정', todo: '📝 우리 집 할 일', seojun: '⭐ 서준이 집', hajun: '🌱 하준이 집' };
 function openPopup(kind: string) {
   closePopup();
+  const slot = $('.pop-slot', app);
+  if (!slot) return;
   popKind = kind;
-  const wrap = document.createElement('div');
-  wrap.id = 'popup';
-  wrap.innerHTML = `<div class="pop-card ${kind}"><button class="pop-close" aria-label="닫기">✕</button><div class="pop-body"></div><div class="pop-timer"><i></i></div></div>`;
-  wrap.onclick = ev => { if (ev.target === wrap) closePopup(); };
-  wrap.addEventListener('pointerdown', () => { bumpPopup(); restartTimerBar(); });
-  wrap.addEventListener('input', () => { bumpPopup(); restartTimerBar(); });
-  $('.pop-close', wrap).onclick = closePopup;
-  document.body.appendChild(wrap);
+  const card = document.createElement('div');
+  card.id = 'popup';
+  card.className = `pop-card ${kind}`;
+  card.innerHTML = `<header class="pop-head"><h2>${POP_TITLE[kind]}</h2><button class="pop-close" aria-label="닫기">✕</button></header><div class="pop-body"></div><div class="pop-timer"><i></i></div>`;
+  card.addEventListener('pointerdown', () => { bumpPopup(); restartTimerBar(); });
+  card.addEventListener('input', () => { bumpPopup(); restartTimerBar(); });
+  $('.pop-close', card).onclick = closePopup;
+  slot.appendChild(card);
+  app.querySelectorAll<HTMLButtonElement>('[data-pop]').forEach(b => b.classList.toggle('on', b.dataset.pop === kind));
   fillPopup();
   bumpPopup();
   restartTimerBar();
@@ -237,15 +266,15 @@ function fillPopup() {
   if (!body || !state) return;
   const s = state;
   if (popKind === 'schedule') {
-    body.innerHTML = `<h2>📅 가족 일정</h2><div class="soon">🗓️<p>아빠·엄마·서준 일정이 여기에 나올 거예요.</p><small>네이버 캘린더 연결은 다음 단계에서 해요.</small></div>`;
+    body.innerHTML = `<div class="soon">🗓️<p>아빠·엄마·서준 일정이 여기에 나올 거예요.</p><small>네이버 캘린더 연결은 다음 단계에서 해요.</small></div>`;
   } else if (popKind === 'hajun') {
-    body.innerHTML = `<h2>🌱 하준이 집</h2><div class="soon">🏠<p>하준이 집과 마당이 곧 열려요!</p></div>`;
+    body.innerHTML = `<div class="soon">🏠<p>하준이 집과 마당이 곧 열려요!</p></div>`;
   } else if (popKind === 'seojun') {
     const pq = s.pq;
-    if (!pq) { body.innerHTML = `<h2>⭐ 서준이 집</h2><p class="soon">${esc(s.pqError)}</p>`; return; }
+    if (!pq) { body.innerHTML = `<p class="soon">${esc(s.pqError)}</p>`; return; }
     const m = pq.dailyMission;
     const lv = pq.village.level;
-    body.innerHTML = `<h2>⭐ 서준이 집</h2>
+    body.innerHTML = `
       <div class="sj">
         <div class="sj-partner">${pq.partner ? `<img src="${esc(pq.partner.image.art)}" alt=""><b>${esc(pq.partner.name)}</b>` : ''}</div>
         <div class="sj-info">
@@ -258,7 +287,7 @@ function fillPopup() {
   } else if (popKind === 'todo') {
     const list = s.todos.filter(t => t.kind === todoTab);
     const person = (k: string | null) => s.people.find(p => p.key === k);
-    body.innerHTML = `<h2>📝 우리 집 할 일</h2>
+    body.innerHTML = `
       <div class="tabs"><button data-tab="todo" class="${todoTab === 'todo' ? 'on' : ''}">🧹 할 일</button><button data-tab="shop" class="${todoTab === 'shop' ? 'on' : ''}">🛒 장보기</button></div>
       <div class="faces"><span>누구예요?</span>${s.people.map(p => `<button data-by="${p.key}" class="${todoBy === p.key ? 'on' : ''}"><i>${p.face}</i>${p.name}</button>`).join('')}</div>
       <form class="add"><input name="text" maxlength="60" placeholder="${todoTab === 'shop' ? '예: 우유, 계란' : '예: 분리수거'}" autocomplete="off"><button>추가</button></form>

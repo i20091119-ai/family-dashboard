@@ -16,7 +16,7 @@ export type State = {
   now: KstNow & { ms: number }; mode: Mode; sim: { offset: number } | null; pqPlayer: 'family' | 'sim';
   morning: { taps: { who: Who; step: string; time: string }[] };
   todos: Todo[]; people: Person[];
-  weather: { place: string; temp: number; max: number; min: number; rain: number | null; emoji: string; text: string } | null;
+  weather: { place: string; temp: number; max: number; min: number; rain: number | null; code: number; emoji: string; text: string; at: string; tip: string; hours: { at: string; temp: number; code: number; rain: number | null }[]; dust: { pm10: number | null; pm25: number | null } | null } | null;
   pq: Pq | null; pqError: string | null; pqBase: string;
   school: { warning: { warn: boolean }; today: { time: string } | null };
 };

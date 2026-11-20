@@ -1,6 +1,6 @@
 // 포켓몬 마을 보기 전용 그림. 눌러도 아무 일 없음 (pointer-events: none).
 // 땅은 캔버스 한 장, 물건·포켓몬은 그 위에. 그림 파일은 포켓퀴즈 사이트에서 바로 불러옴.
-import { autotileQuarters, GROUND_RECTS, groundFn, lockedRegions, OBJECTS, openBox, SHEETS, TILE, villageObjects, type Box, type FamilyVillage } from '../shared/village.ts';
+import { autotileQuarters, GROUND_RECTS, groundFn, lockedRegions, OBJECTS, openBox, SHEETS, TILE, TOP_ROWS, villageObjects, type Box, type FamilyVillage } from '../shared/village.ts';
 import type { Pq } from './types.ts';
 
 const imgCache = new Map<string, Promise<HTMLImageElement>>();
@@ -16,13 +16,23 @@ let wanderTimer = 0;
 /** el 안에 마을을 꽉 차게 그림 */
 export function renderVillage(el: HTMLElement, pq: Pq, base: string) {
   const v = pq.village;
-  const box = openBox(v);
   const W = el.clientWidth, H = el.clientHeight;
   if (!W || !H) return;
-  // 다 들어가게 줄이되, 너무 작아지면 가로 22칸·세로 15칸쯤 보이게 키우고 천천히 위아래(옆)로 훑음
-  const fit = Math.min(W / (box.cols * TILE), H / (box.rows * TILE));
-  const cap = Math.min(W / (Math.min(box.cols, 22) * TILE), H / (Math.min(box.rows, 15) * TILE));
-  const scale = Math.max(fit, cap);
+  // 화면을 빈칸 없이 꽉 채움: 긴 쪽으로 22칸쯤 보이게. 열린 땅이 화면보다 작으면 둘레(잠긴 땅은 안개)까지 넓혀 채우고,
+  // 열린 땅이 화면보다 크면 천천히 훑어봄
+  const open = openBox(v);
+  let scale = Math.max(W, H) / (22 * TILE);
+  const minX = v.map.x0, maxX = v.map.x0 + v.map.width, minY = -TOP_ROWS, maxY = v.map.height;
+  scale = Math.max(scale, W / ((maxX - minX) * TILE), H / ((maxY - minY) * TILE));
+  const grow = (start: number, len: number, need: number, lo: number, hi: number) => {
+    if (len >= need) return [start, len];
+    let a = start - Math.floor((need - len) / 2);
+    a = Math.max(lo, Math.min(a, hi - need));
+    return [a, need];
+  };
+  const [bx, bc] = grow(open.x0, open.cols, Math.ceil(W / (scale * TILE)), minX, maxX);
+  const [by, br] = grow(open.y0, open.rows, Math.ceil(H / (scale * TILE)), minY, maxY);
+  const box: Box = { x0: bx, y0: by, cols: bc, rows: br };
   const key = JSON.stringify([v.map.regions.map(r => r.open), v.placed, v.guests.map(g => g.species), pq.partner?.species, W, H, base]);
   if (key === lastKey && el.querySelector('.vw-world')) return;
   lastKey = key;
@@ -57,6 +67,7 @@ export function renderVillage(el: HTMLElement, pq: Pq, base: string) {
   for (const r of lockedRegions(v, box)) {
     const f = document.createElement('div');
     f.className = 'vw-fog';
+    if (Math.min(r.x + r.w, box.x0 + box.cols) - Math.max(r.x, box.x0) >= 5) f.innerHTML = `<span>🔒 ${r.emoji} ${r.name}</span>`;
     const x = Math.max(r.x, box.x0), y = Math.max(r.y, box.y0);
     Object.assign(f.style, { left: `${(x - box.x0) * TILE * scale}px`, top: `${(y - box.y0) * TILE * scale}px`, width: `${(Math.min(r.x + r.w, box.x0 + box.cols) - x) * TILE * scale}px`, height: `${(Math.min(r.y + r.h, box.y0 + box.rows) - y) * TILE * scale}px` });
     world.appendChild(f);
