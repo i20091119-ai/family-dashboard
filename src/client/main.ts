@@ -5,7 +5,8 @@ import { dustLevel, emojiAt } from '../shared/weather.ts';
 import { DOW, HAJUN_STEPS, kstOf, modeAt, MORNING, MORNING_STEPS, msOfKst, parseHm, type Mode, type Who } from '../shared/time.ts';
 import { ApiError, call, device } from './api.ts';
 import type { State, Todo } from './types.ts';
-import { renderVillage } from './village-view.ts';
+import { familyOn, renderMini, renderVillage } from './village-view.ts';
+import { lpcEl, wander } from './lpc.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -235,6 +236,7 @@ let popTimer = 0;
 let popKind: string | null = null;
 let todoTab: 'todo' | 'shop' = 'todo';
 let todoBy: string | null = null;
+let hajunTimer = 0;
 function closePopup() { $('#popup')?.remove(); window.clearTimeout(popTimer); popKind = null; app.querySelectorAll('[data-pop]').forEach(b => b.classList.remove('on')); }
 function bumpPopup() { window.clearTimeout(popTimer); popTimer = window.setTimeout(closePopup, POPUP_MS); }
 const POP_TITLE: Record<string, string> = { schedule: '📅 가족 일정', todo: '📝 우리 집 할 일', seojun: '⭐ 서준이 집', hajun: '🌱 하준이 집' };
@@ -268,7 +270,36 @@ function fillPopup() {
   if (popKind === 'schedule') {
     body.innerHTML = `<div class="soon">🗓️<p>아빠·엄마·서준 일정이 여기에 나올 거예요.</p><small>네이버 캘린더 연결은 다음 단계에서 해요.</small></div>`;
   } else if (popKind === 'hajun') {
-    body.innerHTML = `<div class="soon">🏠<p>하준이 집과 마당이 곧 열려요!</p></div>`;
+    // 미리보기 (기록 없음): 하준이 집·마당 + 하준 캐릭터 + 습관 카드 2장 + 스티커 10칸
+    const stickers = 3;
+    body.innerHTML = `<div class="hj-grid"><div class="hj-left"><div class="hj-scene"></div>
+      <p class="hj-preview">👀 미리보기예요 · 아직 기록되지 않아요</p></div><div class="hj-right">
+      <div class="hj-habits">
+        <button data-habit="meal"><span>🍚</span><b>앉아서 밥 먹기</b><small>저녁</small></button>
+        <button data-habit="toy"><span>🧸</span><b>장난감 정리</b><small>자기 전</small></button>
+      </div>
+      <div class="hj-stickers"><div class="hj-st-title">⭐ 스티커 <b>${stickers}</b>/10 <small>10개 모으면 마당에 새 물건!</small></div>
+        <div class="hj-st-row">${Array.from({ length: 10 }, (_, i) => `<i class="${i < stickers ? 'on' : ''}">${i < stickers ? '⭐' : ''}</i>`).join('')}</div></div></div></div>`;
+    const scene = $('.hj-scene', body);
+    const tile = Math.floor(scene.clientWidth / 12);
+    const world = renderMini(scene, s.pqBase, [
+      '............', '............', '............', '............', '............', '............',
+      '..=.........', '..======....', '.......=====',
+    ], [
+      { kind: 'house', x: 1, y: 0, filter: 'hue-rotate(28deg) saturate(1.25) brightness(1.05)' },
+      { kind: 'treeRound', x: 9, y: 0 }, { kind: 'pineSmall', x: 7, y: 1 },
+      { kind: 'flowerYellow', x: 6, y: 4 }, { kind: 'flowerPink', x: 0, y: 6 }, { kind: 'flowerWhite', x: 4, y: 8 },
+      // 스티커로 받은 물건 (예시)
+      { kind: 'bench', x: 8, y: 4 }, { kind: 'pot', x: 10, y: 4 }, { kind: 'flowerBox', x: 9, y: 6 },
+      { kind: 'fenceTL', x: 7, y: 3 }, { kind: 'fenceT', x: 8, y: 3 }, { kind: 'fenceT', x: 9, y: 3 }, { kind: 'fenceT', x: 10, y: 3 }, { kind: 'fenceTR', x: 11, y: 3 },
+    ], tile);
+    const hj = lpcEl(s.pqBase, 'hajun', tile * 2.6 / 64);
+    hj.classList.add('vw-person');
+    world.appendChild(hj);
+    const place = (x: number, y: number) => { hj.style.left = `${(x + 0.5) * tile - tile * 1.3}px`; hj.style.top = `${(y + 1) * tile - tile * 2.4}px`; hj.style.zIndex = String(12 + y); };
+    hajunTimer && window.clearInterval(hajunTimer);
+    hajunTimer = wander(hj, place, { x: 4, y: 6 }, 2, (x, y) => (x <= 5 && y < 6) || x < 0 || x > 11 || y > 8);
+    body.querySelectorAll<HTMLButtonElement>('[data-habit]').forEach(b => { b.onclick = () => toast('미리보기예요. 다음 단계에서 어른이 누르면 스티커가 붙어요'); });
   } else if (popKind === 'seojun') {
     const pq = s.pq;
     if (!pq) { body.innerHTML = `<p class="soon">${esc(s.pqError)}</p>`; return; }
@@ -384,6 +415,7 @@ async function openAdmin() {
         <button data-sim="07:40">평일 07:40 아침</button><button data-sim="08:22">평일 08:22</button>
         <button data-sim="18:00">18:00 홈</button><button data-sim="23:00">23:00 밤</button><button data-real>진짜 시각으로</button>
       </div>
+      <label class="toggle"><input type="checkbox" name="family" ${familyOn() ? 'checked' : ''}> 마을에 가족 캐릭터 보이기 (미리보기)</label>
       <label class="toggle"><input type="checkbox" name="pqsim" ${device.pqPlayer === 'sim' ? 'checked' : ''}> 포켓퀴즈 <b>시험용 기록</b> 보기 (포켓퀴즈 개발 탭 시뮬레이션)</label>
       <p class="hint">시험 중엔 아침 버튼 기록이 시험용으로 따로 쌓여요.</p>
       <form class="simarr"><textarea name="text" rows="2">${esc(sample)}</textarea><button>시험 등교 알림 넣기</button></form>
@@ -417,6 +449,7 @@ async function openAdmin() {
     setSim(msOfKst(d, b.dataset.sim!) - Date.now());
   }; });
   $('[data-real]', el).onclick = () => setSim(0);
+  ($('input[name=family]', el) as HTMLInputElement).onchange = ev => { try { localStorage.setItem('fd-family', (ev.target as HTMLInputElement).checked ? 'on' : 'off'); } catch { /* 이 기기에 저장 못 하면 그대로 */ } app.className = ''; render(); };
   ($('input[name=pqsim]', el) as HTMLInputElement).onchange = ev => { device.pqPlayer = (ev.target as HTMLInputElement).checked ? 'sim' : 'family'; void load(); void openAdmin(); };
   ($('form.simarr', el) as HTMLFormElement).onsubmit = async ev => {
     ev.preventDefault();

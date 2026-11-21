@@ -248,3 +248,26 @@ input, textarea { font: inherit; user-select: text; -webkit-user-select: text; }
   .guest-line { font-size: 14px; }
   .sj { flex-direction: column; }
 }
+
+/* ---------- 가족 캐릭터 (LPC) ---------- */
+.lpc { position: absolute; pointer-events: none; transition: left .72s linear, top .72s linear; }
+.lpc i { position: absolute; inset: 0; image-rendering: pixelated; background-repeat: no-repeat; }
+.lpc b { position: absolute; left: 50%; top: 2%; transform: translateX(-50%); font-size: 11px; color: #fff; background: rgba(0,0,0,.45); padding: 0 5px; border-radius: 6px; white-space: nowrap; }
+
+/* ---------- 하준이 집 ---------- */
+.hj-scene { position: relative; width: 100%; aspect-ratio: 12 / 9; border-radius: 12px; overflow: hidden; background: #6cbf5a; }
+.hj-scene .vw-world { position: absolute; left: 0; top: 0; }
+.hj-preview { margin: 6px 0; font-size: 13px; color: var(--muted); text-align: center; }
+.hj-habits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hj-habits button { background: #fff; border: 3px solid #cdeea0; border-radius: 16px; padding: 8px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 3px 0 #cdeea0; }
+.hj-habits span { font-size: 40px; } .hj-habits b { font-size: 17px; } .hj-habits small { color: var(--muted); }
+.hj-stickers { margin-top: 10px; background: #fffbea; border: 2px solid #f5d77a; border-radius: 14px; padding: 8px 10px; }
+.hj-st-title { font-weight: 800; } .hj-st-title small { color: var(--muted); font-weight: 600; margin-left: 4px; }
+.hj-st-row { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 6px; }
+.hj-st-row i { aspect-ratio: 1; border-radius: 50%; border: 2px dashed #e2c46a; display: grid; place-items: center; font-style: normal; font-size: 18px; background: #fff; }
+.hj-st-row i.on { border-style: solid; background: #fff3c4; }
+.pop-card.hajun { width: min(820px, 100%); }
+.hj-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; align-items: start; }
+.hj-right { display: flex; flex-direction: column; }
+@media (orientation: portrait) { .hj-grid { grid-template-columns: 1fr; } }
+@media (orientation: portrait) { .overlay:has(#popup) .bottom { display: none; } }

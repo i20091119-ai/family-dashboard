@@ -2,6 +2,11 @@
 // 땅은 캔버스 한 장, 물건·포켓몬은 그 위에. 그림 파일은 포켓퀴즈 사이트에서 바로 불러옴.
 import { autotileQuarters, GROUND_RECTS, groundFn, lockedRegions, OBJECTS, openBox, SHEETS, TILE, TOP_ROWS, villageObjects, type Box, type FamilyVillage } from '../shared/village.ts';
 import type { Pq } from './types.ts';
+import { lpcEl, wander } from './lpc.ts';
+
+let familyTimers: number[] = [];
+/** 가족 캐릭터 보이기 (미리보기, ⚙️ 개발 메뉴에서 끔) */
+export const familyOn = () => { try { return localStorage.getItem('fd-family') !== 'off'; } catch { return true; } };
 
 const imgCache = new Map<string, Promise<HTMLImageElement>>();
 function loadImg(src: string) {
@@ -103,6 +108,22 @@ export function renderVillage(el: HTMLElement, pq: Pq, base: string) {
     place();
   }, 2500);
 
+  // 가족 캐릭터 (미리보기): 서준이 집 앞에서 천천히 걸음. 서준이 폰으로 마을 안에 있으면 그 자리
+  familyTimers.forEach(t => window.clearInterval(t));
+  familyTimers = [];
+  if (familyOn()) {
+    const tp = TILE * scale, size = tp * 2;
+    const homes: Record<string, { x: number; y: number }> = { seojun: { x: 5, y: 5 }, hajun: { x: 7, y: 6 }, mom: { x: 8, y: 5 }, dad: { x: 4, y: 6 } };
+    const sj = v.seojun;
+    if (sj.inside && typeof sj.x === 'number' && typeof sj.y === 'number') homes.seojun = { x: sj.x, y: sj.y };
+    for (const [id, home] of Object.entries(homes)) {
+      const p = lpcEl(base, id, size / 64);
+      p.classList.add('vw-person');
+      world.appendChild(p);
+      const place = (x: number, y: number) => { p.style.left = `${(x - box.x0 + 0.5) * tp - size / 2}px`; p.style.top = `${(y - box.y0 + 1) * tp - size * 0.92}px`; p.style.zIndex = String(12 + y); };
+      familyTimers.push(wander(p, place, home, id === 'seojun' && sj.inside ? 0 : 2, (x, y) => y < 4));
+    }
+  }
   el.replaceChildren(world);
   pan(world, el);
 }
@@ -133,4 +154,45 @@ function drawGround(canvas: HTMLCanvasElement, img: HTMLImageElement, v: FamilyV
     if (g === 'grass') continue;
     for (const [sx, sy, dx, dy] of autotileQuarters(g, (a, b) => at(a, b) === g, x, y)) ctx.drawImage(img, sx, sy, 8, 8, c * TILE + dx, r * TILE + dy, 8, 8);
   }
+}
+
+
+/** 작은 장면 (하준이 집 마당 등): 땅 글자 줄 + 물건 목록. 칸 크기 tilePx */
+export function renderMini(el: HTMLElement, base: string, rows: string[], objects: { kind: string; x: number; y: number; filter?: string }[], tilePx: number) {
+  const cols = rows[0].length;
+  const scale = tilePx / TILE;
+  const legend: Record<string, string> = { '.': 'grass', '=': 'path', '~': 'water', 's': 'soil', '#': 'stone' };
+  const at = (x: number, y: number) => (legend[rows[y]?.[x] ?? '.'] ?? 'grass') as 'grass' | 'path' | 'water' | 'soil' | 'stone';
+  const world = document.createElement('div');
+  world.className = 'vw-world';
+  world.style.width = `${cols * tilePx}px`;
+  world.style.height = `${rows.length * tilePx}px`;
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * TILE; canvas.height = rows.length * TILE; canvas.className = 'vw-ground';
+  world.appendChild(canvas);
+  void loadImg(base + SHEETS.ground.file).then(img => {
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < rows.length; y++) for (let x = 0; x < cols; x++) {
+      const g = at(x, y); const [sx, sy] = GROUND_RECTS[g === 'water' ? 'water' : 'grass'].rect;
+      ctx.drawImage(img, sx, sy, TILE, TILE, x * TILE, y * TILE, TILE, TILE);
+      if (g === 'grass') continue;
+      for (const [qx, qy, dx, dy] of autotileQuarters(g, (a, b) => a >= 0 && b >= 0 && a < cols && b < rows.length && at(a, b) === g, x, y)) ctx.drawImage(img, qx, qy, 8, 8, x * TILE + dx, y * TILE + dy, 8, 8);
+    }
+  }).catch(() => undefined);
+  const sheet = base + SHEETS.objects.file;
+  for (const o of objects) {
+    const info = OBJECTS[o.kind]; if (!info) continue;
+    const [sx, sy, w, h] = info.rect;
+    const i = document.createElement('i');
+    i.className = 'vw-obj';
+    Object.assign(i.style, {
+      left: `${o.x * tilePx}px`, top: `${o.y * tilePx}px`, width: `${w * scale}px`, height: `${h * scale}px`,
+      backgroundImage: `url(${sheet})`, backgroundSize: `${SHEETS.objects.width * scale}px ${SHEETS.objects.height * scale}px`,
+      backgroundPosition: `${-sx * scale}px ${-sy * scale}px`, zIndex: String(info.flat ? 3 : 11 + o.y + info.cells[1] - 1), filter: o.filter ?? '',
+    });
+    world.appendChild(i);
+  }
+  el.replaceChildren(world);
+  return world;
 }
