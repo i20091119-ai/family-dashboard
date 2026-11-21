@@ -11,7 +11,11 @@ type ObjInfo = { rect: Rect; cells: number[]; foot?: number[] | null; flat?: boo
 export const TILE = assets.tile;
 export const SHEETS = assets.sheets;
 export const GROUND_RECTS = assets.ground as Record<string, { rect: Rect }>;
-export const OBJECTS = assets.objects as unknown as Record<string, ObjInfo>;
+export const OBJECTS: Record<string, ObjInfo & { img?: string }> = {
+  ...(assets.objects as unknown as Record<string, ObjInfo>),
+  // 하준이 집 (노란 벽·빨간 지붕): 포켓퀴즈 그림판에 들어가기 전까지 대시보드 그림 한 장으로
+  houseHajun: { rect: [0, 0, 80, 96], cells: [5, 6], foot: [0, 3, 5, 3], img: '/img/hajun-house.png' },
+};
 /** 지도 위쪽에 더 그리는 숲 줄 (그림만) */
 export const TOP_ROWS = 2;
 

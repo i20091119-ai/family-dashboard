@@ -57,13 +57,15 @@ export function renderVillage(el: HTMLElement, pq: Pq, base: string) {
   // 물건
   const sheet = base + SHEETS.objects.file;
   for (const o of villageObjects(v, box)) {
-    const [sx, sy, w, h] = OBJECTS[o.kind].rect;
+    const info = OBJECTS[o.kind];
+    const [sx, sy, w, h] = info.rect;
     const i = document.createElement('i');
     i.className = 'vw-obj';
     Object.assign(i.style, {
       left: `${(o.x - box.x0) * TILE * scale}px`, top: `${(o.y - box.y0) * TILE * scale}px`, width: `${w * scale}px`, height: `${h * scale}px`,
-      backgroundImage: `url(${sheet})`, backgroundSize: `${SHEETS.objects.width * scale}px ${SHEETS.objects.height * scale}px`,
-      backgroundPosition: `${-sx * scale}px ${-sy * scale}px`, zIndex: String(o.z),
+      backgroundImage: `url(${info.img ?? sheet})`,
+      backgroundSize: info.img ? `${w * scale}px ${h * scale}px` : `${SHEETS.objects.width * scale}px ${SHEETS.objects.height * scale}px`,
+      backgroundPosition: info.img ? '0 0' : `${-sx * scale}px ${-sy * scale}px`, zIndex: String(o.z),
     });
     world.appendChild(i);
   }
@@ -113,7 +115,9 @@ export function renderVillage(el: HTMLElement, pq: Pq, base: string) {
   familyTimers = [];
   if (familyOn()) {
     const tp = TILE * scale, size = tp * 2;
-    const homes: Record<string, { x: number; y: number }> = { seojun: { x: 5, y: 5 }, hajun: { x: 7, y: 6 }, mom: { x: 8, y: 5 }, dad: { x: 4, y: 6 } };
+    // 하준이 집이 마을에 있으면 하준은 그 집 앞, 아니면 서준이 집 앞
+    const hjHouse = v.map.fixedObjects.find(o => o.kind === 'houseHajun');
+    const homes: Record<string, { x: number; y: number }> = { seojun: { x: 5, y: 5 }, hajun: hjHouse ? { x: hjHouse.x + 2, y: 5 } : { x: 7, y: 6 }, mom: { x: 8, y: 6 }, dad: { x: 3, y: 6 } };
     const sj = v.seojun;
     if (sj.inside && typeof sj.x === 'number' && typeof sj.y === 'number') homes.seojun = { x: sj.x, y: sj.y };
     // 서로 같은 칸에 겹치지 않게 (지금 서 있는 칸 기억)
