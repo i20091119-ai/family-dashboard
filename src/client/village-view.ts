@@ -158,7 +158,7 @@ function drawGround(canvas: HTMLCanvasElement, img: HTMLImageElement, v: FamilyV
 
 
 /** 작은 장면 (하준이 집 마당 등): 땅 글자 줄 + 물건 목록. 칸 크기 tilePx */
-export function renderMini(el: HTMLElement, base: string, rows: string[], objects: { kind: string; x: number; y: number; filter?: string }[], tilePx: number) {
+export function renderMini(el: HTMLElement, base: string, rows: string[], objects: { kind: string; x: number; y: number; img?: string }[], tilePx: number) {
   const cols = rows[0].length;
   const scale = tilePx / TILE;
   const legend: Record<string, string> = { '.': 'grass', '=': 'path', '~': 'water', 's': 'soil', '#': 'stone' };
@@ -186,10 +186,12 @@ export function renderMini(el: HTMLElement, base: string, rows: string[], object
     const [sx, sy, w, h] = info.rect;
     const i = document.createElement('i');
     i.className = 'vw-obj';
+    // img = 색만 바꾼 그림 한 장 (하준이 집: 노란 벽·빨간 지붕)
     Object.assign(i.style, {
       left: `${o.x * tilePx}px`, top: `${o.y * tilePx}px`, width: `${w * scale}px`, height: `${h * scale}px`,
-      backgroundImage: `url(${sheet})`, backgroundSize: `${SHEETS.objects.width * scale}px ${SHEETS.objects.height * scale}px`,
-      backgroundPosition: `${-sx * scale}px ${-sy * scale}px`, zIndex: String(info.flat ? 3 : 11 + o.y + info.cells[1] - 1), filter: o.filter ?? '',
+      backgroundImage: `url(${o.img ?? sheet})`,
+      backgroundSize: o.img ? `${w * scale}px ${h * scale}px` : `${SHEETS.objects.width * scale}px ${SHEETS.objects.height * scale}px`,
+      backgroundPosition: o.img ? '0 0' : `${-sx * scale}px ${-sy * scale}px`, zIndex: String(info.flat ? 3 : 11 + o.y + info.cells[1] - 1),
     });
     world.appendChild(i);
   }

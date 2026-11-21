@@ -236,8 +236,8 @@ let popTimer = 0;
 let popKind: string | null = null;
 let todoTab: 'todo' | 'shop' = 'todo';
 let todoBy: string | null = null;
-let hajunTimer = 0;
-function closePopup() { $('#popup')?.remove(); window.clearTimeout(popTimer); popKind = null; app.querySelectorAll('[data-pop]').forEach(b => b.classList.remove('on')); }
+let houseTimers: number[] = [];
+function closePopup() { $('#popup')?.remove(); window.clearTimeout(popTimer); houseTimers.forEach(h => window.clearInterval(h)); houseTimers = []; popKind = null; app.querySelectorAll('[data-pop]').forEach(b => b.classList.remove('on')); }
 function bumpPopup() { window.clearTimeout(popTimer); popTimer = window.setTimeout(closePopup, POPUP_MS); }
 const POP_TITLE: Record<string, string> = { schedule: '📅 가족 일정', todo: '📝 우리 집 할 일', seojun: '⭐ 서준이 집', hajun: '🌱 하준이 집' };
 function openPopup(kind: string) {
@@ -286,7 +286,7 @@ function fillPopup() {
       '............', '............', '............', '............', '............', '............',
       '..=.........', '..======....', '.......=====',
     ], [
-      { kind: 'house', x: 1, y: 0, filter: 'hue-rotate(28deg) saturate(1.25) brightness(1.05)' },
+      { kind: 'house', x: 1, y: 0, img: '/img/hajun-house.png' },
       { kind: 'treeRound', x: 9, y: 0 }, { kind: 'pineSmall', x: 7, y: 1 },
       { kind: 'flowerYellow', x: 6, y: 4 }, { kind: 'flowerPink', x: 0, y: 6 }, { kind: 'flowerWhite', x: 4, y: 8 },
       // 스티커로 받은 물건 (예시)
@@ -297,24 +297,51 @@ function fillPopup() {
     hj.classList.add('vw-person');
     world.appendChild(hj);
     const place = (x: number, y: number) => { hj.style.left = `${(x + 0.5) * tile - tile * 1.3}px`; hj.style.top = `${(y + 1) * tile - tile * 2.4}px`; hj.style.zIndex = String(12 + y); };
-    hajunTimer && window.clearInterval(hajunTimer);
-    hajunTimer = wander(hj, place, { x: 4, y: 6 }, 2, (x, y) => (x <= 5 && y < 6) || x < 0 || x > 11 || y > 8);
+    houseTimers.forEach(h => window.clearInterval(h));
+    houseTimers = [wander(hj, place, { x: 4, y: 6 }, 2, (x, y) => (x <= 5 && y < 6) || x < 0 || x > 11 || y > 8)];
     body.querySelectorAll<HTMLButtonElement>('[data-habit]').forEach(b => { b.onclick = () => toast('미리보기예요. 다음 단계에서 어른이 누르면 스티커가 붙어요'); });
   } else if (popKind === 'seojun') {
+    // 서준이 집: 집 앞 마당(서준 캐릭터 + 파트너 포켓몬, 보기만) + 오늘 미션·이번 주 훈련·마을
     const pq = s.pq;
     if (!pq) { body.innerHTML = `<p class="soon">${esc(s.pqError)}</p>`; return; }
     const m = pq.dailyMission;
     const lv = pq.village.level;
-    body.innerHTML = `
-      <div class="sj">
-        <div class="sj-partner">${pq.partner ? `<img src="${esc(pq.partner.image.art)}" alt=""><b>${esc(pq.partner.name)}</b>` : ''}</div>
-        <div class="sj-info">
-          <p class="sj-mission">${m.done ? '✅ 오늘 일일미션 끝!' : m.started ? `✏️ 오늘 일일미션 ${m.answered}/${m.total}` : '📚 오늘 일일미션은 아직이야'}</p>
-          <div class="sj-train">${trainingMini(pq.training)}</div>
-          <p class="sj-goal">${pq.training.reached ? '이번 주 훈련 목표 달성! 💎' : `이번 주 목표까지 <b>${Math.max(0, pq.training.goal - pq.training.score)}</b> 남았어`}</p>
-          <p class="sj-village">🏡 마을 Lv.${lv.level} · 🏠 마을점수 ${lv.points}${lv.next ? `/${lv.next}` : ''}</p>
-        </div>
-      </div>`;
+    const t = pq.training;
+    const left = Math.max(0, t.goal - t.score);
+    body.innerHTML = `<div class="hj-grid"><div class="hj-left"><div class="hj-scene sj-scene"></div>
+        <p class="hj-preview">🏠 서준이 방은 다음 단계에서 열려요</p></div>
+      <div class="hj-right">
+        <div class="sj-card ${m.done ? 'done' : ''}"><span>${m.done ? '✅' : '✏️'}</span><div><b>오늘 일일미션</b><small>${m.done ? '다 했어! 마을에 들어갈 수 있어' : m.started ? `${m.answered}/${m.total} 풀었어` : '아직 시작 전이야'}</small></div></div>
+        <div class="sj-card train"><div class="sj-tt"><b>📅 이번 주 훈련</b><em>${t.score}/${t.goal}</em></div>
+          <div class="sj-days">${t.days.map(d => `<span class="${d.mark ?? ''} ${d.future ? 'future' : ''} ${d.date === pq.today ? 'today' : ''}"><i>${d.mark ? MARK[d.mark] : ''}</i><small>${d.dow}</small></span>`).join('')}</div>
+          <div class="sj-bar"><i style="width:${Math.min(100, (t.score / Math.max(1, t.goal)) * 100)}%"></i></div>
+          <small class="sj-left">${t.reached ? '이번 주 목표 달성! 💎 전설 조각을 받을 거야' : `${left}개 더 하면 이번 주 목표!`}</small></div>
+        <div class="sj-card"><span>🏡</span><div><b>포켓몬 마을 Lv.${lv.level}</b><small>🏠 마을점수 ${lv.points}${lv.next ? ` / ${lv.next}` : ''}${pq.village.guests.length ? ` · 손님 ${pq.village.guests.length}마리` : ''}</small></div></div>
+      </div></div>`;
+    const scene = $('.sj-scene', body);
+    const tile = Math.floor(scene.clientWidth / 12);
+    const world = renderMini(scene, s.pqBase, [
+      '............', '............', '............', '............', '............', '............',
+      '..=.........', '..==========', '............',
+    ], [
+      { kind: 'house', x: 1, y: 0 }, { kind: 'mailbox', x: 6, y: 3 },
+      { kind: 'treePine', x: 9, y: 0 }, { kind: 'fruitTree_apple', x: 7, y: 2 },
+      { kind: 'flowerRed', x: 0, y: 6 }, { kind: 'flowerBlue', x: 10, y: 5 }, { kind: 'mushroom', x: 5, y: 8 }, { kind: 'rock', x: 11, y: 8 },
+    ], tile);
+    const sj = lpcEl(s.pqBase, 'seojun', tile * 2 / 64);
+    sj.classList.add('vw-person');
+    world.appendChild(sj);
+    const placeP = (el: HTMLElement, k: number) => (x: number, y: number) => { el.style.left = `${(x + 0.5) * tile - tile * k / 2}px`; el.style.top = `${(y + 1) * tile - tile * k * 0.92}px`; el.style.zIndex = String(12 + y); };
+    const block = (x: number, y: number) => (x <= 5 && y < 6) || x < 0 || x > 11 || y > 8 || (x >= 7 && x <= 8 && y < 5);
+    houseTimers.forEach(h => window.clearInterval(h));
+    houseTimers = [wander(sj, placeP(sj, 2), { x: 3, y: 6 }, 2, block)];
+    if (pq.partner) {
+      const mon = document.createElement('img');
+      mon.className = 'vw-mon-mini'; mon.src = pq.partner.image.pixel; mon.alt = pq.partner.name;
+      mon.style.width = mon.style.height = `${tile * 3}px`; mon.style.position = 'absolute';
+      world.appendChild(mon);
+      houseTimers.push(wander(mon, placeP(mon, 3), { x: 5, y: 7 }, 2, block));
+    }
   } else if (popKind === 'todo') {
     const list = s.todos.filter(t => t.kind === todoTab);
     const person = (k: string | null) => s.people.find(p => p.key === k);
