@@ -205,7 +205,7 @@ function renderHome() {
           <button data-pop="hajun"><span>🌱</span>하준이 집</button>
         </nav>
         <div class="pop-slot"></div>
-        <footer class="bottom"><p class="guest-line"></p><aside class="training"></aside></footer>
+        <footer class="bottom"><p class="guest-line"></p></footer>
       </div>
       <button class="gear" aria-label="설정">⚙️<i class="dot"></i></button>`;
     app.querySelectorAll<HTMLButtonElement>('[data-pop]').forEach(b => { b.onclick = () => (popKind === b.dataset.pop ? closePopup() : openPopup(b.dataset.pop!)); });
@@ -217,19 +217,12 @@ function renderHome() {
   const gl = $('.guest-line', app);
   if (gl.dataset.html !== guestLine) { gl.innerHTML = guestLine; gl.dataset.html = guestLine; }
   gl.hidden = !guestLine;
-  const tr = $('.training', app);
-  const th = pq ? trainingMini(pq.training) + `<p class="t-cheer">${pq.training.reached ? '이번 주 목표 달성! 💎' : `${Math.max(0, pq.training.goal - pq.training.score)}개 남았어! 힘내`}</p>` : `<small>${esc(s.pqError ?? '')}</small>`;
-  if (tr.dataset.html !== th) { tr.innerHTML = th; tr.dataset.html = th; }
   const vEl = $('.village', app);
   if (pq) renderVillage(vEl, pq, s.pqBase);
   else vEl.innerHTML = `<div class="village-empty">🏡<br><small>${esc(s.pqError ?? '포켓몬 마을을 불러오는 중…')}</small></div>`;
 }
 
 const MARK = { book: '●', other: '■', try: '▲' } as Record<string, string>;
-function trainingMini(t: NonNullable<State['pq']>['training']) {
-  return `<div class="t-title">⭐ 서준 훈련 <b>${t.score}</b>/${t.goal}${t.reached ? ' 🎉' : ''}</div>
-    <div class="t-days">${t.days.map(d => `<span class="${d.mark ?? ''} ${d.future ? 'future' : ''}"><i>${d.mark ? MARK[d.mark] : '·'}</i><small>${d.dow}</small></span>`).join('')}</div>`;
-}
 
 // ---------- 팝업 (30초 뒤 저절로 닫힘, 만지면 다시 30초) ----------
 let popTimer = 0;
