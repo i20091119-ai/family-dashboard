@@ -15,6 +15,17 @@ export const PEOPLE = [
   { key: 'grandma', name: '외할머니', face: '👵' },
 ];
 const PEOPLE_KEYS = PEOPLE.map(p => p.key);
+/** 일정의 주인 (사람별 색은 화면에서: 아빠 초록 · 엄마 분홍 · 서준 빨강 · 하준 노랑 · 가족 파랑) */
+export const OWNERS = [
+  { key: 'dad', name: '아빠' }, { key: 'mom', name: '엄마' }, { key: 'seojun', name: '서준' }, { key: 'hajun', name: '하준' }, { key: 'family', name: '가족' },
+];
+
+async function scheduleList(env: Env, from: string, days: number) {
+  const to = shiftDate(from, days - 1);
+  const { results } = await env.DB.prepare(`SELECT id, date, time, text, who, by FROM schedule WHERE deleted = 0 AND date >= ? AND date <= ?
+    ORDER BY date, time IS NOT NULL, time, id`).bind(from, to).all();
+  return results;
+}
 
 /** 이 기기의 시험 시각(개발 메뉴): 진짜 시각에 더할 ms. 0이면 진짜 */
 function simOffset(request: Request) {
@@ -75,13 +86,13 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
 
   if (path === '/api/state' && method === 'GET') {
     await retryPending(env, kstOf(Date.now()).date).catch(() => undefined);
-    const [pq, weather, taps, todos, arrivals] = await Promise.all([
-      readFamily(env, player), getWeather(env), morningTaps(env, now.date, sim), todoList(env, now.date), recentArrivals(env, sim, 14),
+    const [pq, weather, taps, todos, arrivals, schedule] = await Promise.all([
+      readFamily(env, player), getWeather(env), morningTaps(env, now.date, sim), todoList(env, now.date), recentArrivals(env, sim, 14), scheduleList(env, now.date, 7),
     ]);
     const dates = [...arrivals.map(a => a.date), ...(pq.data?.school.recent.map(r => r.date) ?? [])];
     return json({
       now: { ms: Date.now() + offset, ...now }, mode: modeAt(now), sim: offset !== 0 ? { offset } : null, pqPlayer: player,
-      morning: { taps }, todos, people: PEOPLE, weather,
+      morning: { taps }, todos, people: PEOPLE, owners: OWNERS, schedule, weather,
       pq: pq.data, pqError: pq.error, pqBase: pq.base,
       school: { warning: schoolWarning(now, dates), today: arrivals.find(a => a.date === now.date) ?? null },
     });
@@ -119,6 +130,25 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
       await env.DB.prepare('UPDATE todos SET deleted = 1 WHERE id = ?').bind(id).run();
     } else return json({ error: '다시 눌러 주세요.' }, 400);
     return json({ todos: await todoList(env, now.date) });
+  }
+
+  if (path === '/api/schedule' && method === 'POST') {
+    const b = await readBody(request);
+    const by = String(b.by ?? '');
+    if (!PEOPLE_KEYS.includes(by)) return json({ error: '얼굴 버튼을 먼저 눌러 주세요.' }, 400);
+    if (b.op === 'add') {
+      const date = String(b.date ?? '');
+      const time = b.time ? String(b.time) : null;
+      const text = String(b.text ?? '').trim().slice(0, 40);
+      const who = OWNERS.some(o => o.key === b.who) ? String(b.who) : 'family';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: '날짜를 골라 주세요.' }, 400);
+      if (time !== null && !/^\d{2}:\d{2}$/.test(time)) return json({ error: '시각을 확인해 주세요.' }, 400);
+      if (!text) return json({ error: '일정을 적어 주세요.' }, 400);
+      await env.DB.prepare('INSERT INTO schedule (date, time, text, who, by, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(date, time, text, who, by, new Date().toISOString()).run();
+    } else if (b.op === 'delete') {
+      await env.DB.prepare('UPDATE schedule SET deleted = 1 WHERE id = ?').bind(Number(b.id)).run();
+    } else return json({ error: '다시 눌러 주세요.' }, 400);
+    return json({ schedule: await scheduleList(env, now.date, 7) });
   }
 
   if (path === '/api/admin' && method === 'GET') {

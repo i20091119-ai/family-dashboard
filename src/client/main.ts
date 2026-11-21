@@ -205,7 +205,7 @@ function renderHome() {
           <button data-pop="hajun"><span>🌱</span>하준이 집</button>
         </nav>
         <div class="pop-slot"></div>
-        <footer class="bottom"><p class="guest-line"></p></footer>
+        <footer class="bottom"><p class="guest-line"></p><button class="today-card" data-pop="schedule"></button></footer>
       </div>
       <button class="gear" aria-label="설정">⚙️<i class="dot"></i></button>`;
     app.querySelectorAll<HTMLButtonElement>('[data-pop]').forEach(b => { b.onclick = () => (popKind === b.dataset.pop ? closePopup() : openPopup(b.dataset.pop!)); });
@@ -217,10 +217,28 @@ function renderHome() {
   const gl = $('.guest-line', app);
   if (gl.dataset.html !== guestLine) { gl.innerHTML = guestLine; gl.dataset.html = guestLine; }
   gl.hidden = !guestLine;
+  // 오른쪽 아래: 오늘 일정 (늘 떠 있음, 누르면 가족 일정 창)
+  const tc = $('.today-card', app);
+  const th = todayCard();
+  if (tc.dataset.html !== th) { tc.innerHTML = th; tc.dataset.html = th; }
   const vEl = $('.village', app);
   if (pq) renderVillage(vEl, pq, s.pqBase);
   else vEl.innerHTML = `<div class="village-empty">🏡<br><small>${esc(s.pqError ?? '포켓몬 마을을 불러오는 중…')}</small></div>`;
 }
+
+// ---------- 가족 일정 ----------
+const ownerName = (k: string) => state!.owners.find(o => o.key === k)?.name ?? '가족';
+function schedLine(e: State['schedule'][number], del = false) {
+  return `<li class="who-${esc(e.who)}"><i></i><span class="s-time">${e.time ?? '하루 종일'}</span><span class="s-text">${esc(e.text)}</span><small>${esc(ownerName(e.who))}</small>${del ? `<button class="del" data-sdel="${e.id}" aria-label="지우기">✕</button>` : ''}</li>`;
+}
+function todayCard() {
+  const n = now();
+  const list = state!.schedule.filter(e => e.date === n.date);
+  return `<div class="tc-title">📅 오늘 일정 <small>${Number(n.date.slice(5, 7))}/${Number(n.date.slice(8))} ${DOW[n.weekday]}</small></div>
+    ${list.length ? `<ul class="sched">${list.slice(0, 5).map(e => schedLine(e)).join('')}${list.length > 5 ? `<li class="more">그 밖에 ${list.length - 5}개</li>` : ''}</ul>` : '<p class="tc-empty">오늘은 일정이 없어요 😊</p>'}`;
+}
+let schedWho = 'family';
+let schedDay = 0;
 
 const MARK = { book: '●', other: '■', try: '▲' } as Record<string, string>;
 
@@ -261,7 +279,31 @@ function fillPopup() {
   if (!body || !state) return;
   const s = state;
   if (popKind === 'schedule') {
-    body.innerHTML = `<div class="soon">🗓️<p>아빠·엄마·서준 일정이 여기에 나올 거예요.</p><small>네이버 캘린더 연결은 다음 단계에서 해요.</small></div>`;
+    const n = now();
+    const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(Date.parse(n.date + 'T00:00:00Z') + i * 86400_000); return d.toISOString().slice(0, 10); });
+    const label = (d: string, i: number) => `${i === 0 ? '오늘' : i === 1 ? '내일' : ''} ${Number(d.slice(5, 7))}/${Number(d.slice(8))} ${DOW[new Date(d + 'T00:00:00Z').getUTCDay()]}`;
+    body.innerHTML = `<div class="hj-grid"><div class="sched-week">${days.map((d, i) => {
+        const list = s.schedule.filter(e => e.date === d);
+        return `<section class="${i === 0 ? 'today' : ''}"><h3>${label(d, i)}</h3>${list.length ? `<ul class="sched">${list.map(e => schedLine(e, true)).join('')}</ul>` : '<p class="tc-empty">일정 없음</p>'}</section>`;
+      }).join('')}</div>
+      <form class="sched-add"><h3>✏️ 일정 적기</h3>
+        <div class="faces"><span>누가 적어요?</span>${s.people.map(p => `<button type="button" data-by="${p.key}" class="${todoBy === p.key ? 'on' : ''}"><i>${p.face}</i>${p.name}</button>`).join('')}</div>
+        <div class="chips"><span>누구 일정?</span>${s.owners.map(o => `<button type="button" data-who="${o.key}" class="who-${o.key} ${schedWho === o.key ? 'on' : ''}">${o.name}</button>`).join('')}</div>
+        <div class="chips"><span>언제?</span>${days.slice(0, 7).map((d, i) => `<button type="button" data-day="${i}" class="${schedDay === i ? 'on' : ''}">${i === 0 ? '오늘' : i === 1 ? '내일' : `${Number(d.slice(8))}일 ${DOW[new Date(d + 'T00:00:00Z').getUTCDay()]}`}</button>`).join('')}</div>
+        <div class="add"><input name="time" type="time" aria-label="시각 (비우면 하루 종일)"><input name="text" maxlength="40" placeholder="예: 피아노 학원" autocomplete="off"><button>추가</button></div>
+        <p class="hint-small">시각을 비우면 "하루 종일". 네이버 캘린더는 다음 단계에서 이어 붙여요.</p>
+      </form></div>`;
+    body.querySelectorAll<HTMLButtonElement>('[data-by]').forEach(b => { b.onclick = () => { todoBy = b.dataset.by!; fillPopup(); }; });
+    body.querySelectorAll<HTMLButtonElement>('[data-who]').forEach(b => { b.onclick = () => { schedWho = b.dataset.who!; fillPopup(); }; });
+    body.querySelectorAll<HTMLButtonElement>('[data-day]').forEach(b => { b.onclick = () => { schedDay = Number(b.dataset.day); fillPopup(); }; });
+    const form = $('form.sched-add', body) as HTMLFormElement;
+    form.onsubmit = ev => {
+      ev.preventDefault();
+      const text = (form.elements.namedItem('text') as HTMLInputElement).value;
+      const time = (form.elements.namedItem('time') as HTMLInputElement).value;
+      if (text.trim()) void schedOp({ op: 'add', date: days[schedDay], time: time || null, text, who: schedWho });
+    };
+    body.querySelectorAll<HTMLButtonElement>('[data-sdel]').forEach(b => { b.onclick = () => { if (confirm('이 일정을 지울까요?')) void schedOp({ op: 'delete', id: Number(b.dataset.sdel) }); }; });
   } else if (popKind === 'hajun') {
     // 미리보기 (기록 없음): 하준이 집·마당 + 하준 캐릭터 + 습관 카드 2장 + 스티커 10칸
     const stickers = 3;
@@ -356,6 +398,15 @@ function todoItem(t: Todo, face: string, doneFace: string) {
   const time = done ? new Date(t.done_at!).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }) : '';
   return `<li class="${done ? 'done' : ''}"><button class="check" data-done="${t.id}" data-state="${done ? 'done' : ''}">${done ? '✅' : '⬜'}</button>
     <span class="text">${esc(t.text)}</span><span class="meta">${done ? `${doneFace} ${time}` : face}</span><button class="del" data-del="${t.id}" aria-label="지우기">✕</button></li>`;
+}
+async function schedOp(body: Record<string, unknown>) {
+  if (!todoBy) { toast('먼저 내 얼굴 버튼을 눌러 주세요'); $('#popup .faces')?.classList.add('shake'); return; }
+  try {
+    const r = await call<{ schedule: State['schedule'] }>('/api/schedule', { ...body, by: todoBy });
+    state!.schedule = r.schedule;
+    fillPopup();
+    render();
+  } catch (e) { toast((e as Error).message); }
 }
 async function todoOp(body: Record<string, unknown>) {
   if (!todoBy) { toast('먼저 내 얼굴 버튼을 눌러 주세요'); $('#popup .faces')?.classList.add('shake'); return; }

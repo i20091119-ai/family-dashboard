@@ -291,3 +291,32 @@ input, textarea { font: inherit; user-select: text; -webkit-user-select: text; }
 .sj-bar { height: 10px; border-radius: 5px; background: #e8eef6; overflow: hidden; }
 .sj-bar i { display: block; height: 100%; background: linear-gradient(90deg, #6cc3ff, #2f80ed); }
 .sj-left { display: block; margin-top: 4px; font-weight: 700; color: #d9771a !important; }
+
+/* ---------- 오늘 일정 카드 · 가족 일정 ---------- */
+.today-card { margin-left: auto; text-align: left; min-width: 250px; max-width: 340px; background: rgba(255,253,246,.96); border: 3px solid #9fd0f5; border-radius: 16px; padding: 8px 12px; box-shadow: 0 3px 0 rgba(0,0,0,.2); }
+.tc-title { font-weight: 900; font-size: 17px; color: #1d4e8f; margin-bottom: 4px; }
+.tc-title small { font-weight: 700; color: var(--muted); font-size: 13px; margin-left: 4px; }
+.tc-empty { margin: 2px 0; color: var(--muted); font-size: 14px; }
+.sched { list-style: none; margin: 0; padding: 0; }
+.sched li { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 15px; border-bottom: 1px dashed #e6dccb; }
+.sched li:last-child { border-bottom: 0; }
+.sched li > i { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--c, #2f80ed); }
+.sched .s-time { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 44px; font-size: 14px; }
+.sched .s-text { flex: 1; }
+.sched small { font-size: 12px; color: #fff; background: var(--c, #2f80ed); border-radius: 8px; padding: 0 6px; }
+.sched .more { color: var(--muted); font-size: 13px; }
+.who-dad { --c: #3f9a52; } .who-mom { --c: #e46fa3; } .who-seojun { --c: #e0463c; } .who-hajun { --c: #e0a800; } .who-family { --c: #2f80ed; }
+.pop-card.schedule { width: min(820px, 100%); }
+.sched-week { display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow: auto; }
+.sched-week section { background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 4px 10px; }
+.sched-week section.today { border-color: #9fd0f5; background: #f2f9ff; }
+.sched-week h3 { margin: 2px 0; font-size: 15px; }
+.sched-week .del { color: #b9a68a; font-size: 15px; padding: 0 4px; }
+.sched-add h3 { margin: 0 0 6px; font-size: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 8px; }
+.chips span { color: var(--muted); font-size: 14px; }
+.chips button { border: 2px solid var(--line); background: #fff; border-radius: 12px; padding: 3px 10px; font-weight: 700; font-size: 14px; }
+.chips button.on { border-color: var(--c, var(--accent)); background: var(--c, var(--accent)); color: #fff; }
+.sched-add .add input[type=time] { flex: none; width: 116px; }
+.hint-small { font-size: 12px; color: var(--muted); margin: 0; }
+@media (orientation: portrait) { .today-card { margin-left: 0; max-width: none; } }

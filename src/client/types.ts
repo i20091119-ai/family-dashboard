@@ -3,6 +3,7 @@ import type { KstNow, Mode, Who } from '../shared/time.ts';
 
 type Img = { art: string; pixel: string };
 export type Person = { key: string; name: string; face: string };
+export type Sched = { id: number; date: string; time: string | null; text: string; who: string; by: string };
 export type Todo = { id: number; kind: 'todo' | 'shop'; text: string; by: string; created_at: string; done_by: string | null; done_at: string | null };
 export type Pq = {
   player: 'family' | 'sim'; today: string; now: string;
@@ -16,6 +17,8 @@ export type State = {
   now: KstNow & { ms: number }; mode: Mode; sim: { offset: number } | null; pqPlayer: 'family' | 'sim';
   morning: { taps: { who: Who; step: string; time: string }[] };
   todos: Todo[]; people: Person[];
+  owners: { key: string; name: string }[];
+  schedule: Sched[];
   weather: { place: string; temp: number; max: number; min: number; rain: number | null; code: number; emoji: string; text: string; at: string; tip: string; hours: { at: string; temp: number; code: number; rain: number | null }[]; dust: { pm10: number | null; pm25: number | null } | null } | null;
   pq: Pq | null; pqError: string | null; pqBase: string;
   school: { warning: { warn: boolean }; today: { time: string } | null };
