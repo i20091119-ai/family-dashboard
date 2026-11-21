@@ -58,9 +58,11 @@ jobs:
         if: steps.token.outputs.ready == 'true'
         run: |
           name="${{ steps.names.outputs.db }}"
-          find_db() { npx wrangler d1 list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const i=s.indexOf("[");const l=i<0?[]:JSON.parse(s.slice(i));const d=l.find(x=>x.name===process.argv[1]);if(d)console.log(d.uuid)})' "$name"; }
+          echo "열쇠로 Cloudflare 계정 확인:"
+          npx wrangler whoami || true
+          find_db() { npx wrangler d1 list --json > d1.json 2> d1.err || true; node -e 'const s=require("fs").readFileSync("d1.json","utf8");try{const l=JSON.parse(s);const d=l.find(x=>x.name===process.argv[1]);if(d)console.log(d.uuid)}catch(e){console.error("d1 list 결과를 읽지 못함:\n"+s.slice(0,1500))}' "$name"; }
           uuid=$(find_db)
-          if [ -z "$uuid" ]; then npx wrangler d1 create "$name"; uuid=$(find_db); fi
+          if [ -z "$uuid" ]; then npx wrangler d1 create "$name" || cat d1.err; uuid=$(find_db); fi
           [ -n "$uuid" ] || { echo "::error::기록 저장소 번호를 찾지 못했어요."; exit 1; }
           sed -i "s/\"database_id\": \"[^\"]*\"/\"database_id\": \"$uuid\"/" wrangler.jsonc
 

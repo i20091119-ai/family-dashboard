@@ -2,3 +2,5 @@ node_modules
 .wrangler
 public/app.js
 .dev.vars
+d1.json
+d1.err
