@@ -116,12 +116,14 @@ export function renderVillage(el: HTMLElement, pq: Pq, base: string) {
     const homes: Record<string, { x: number; y: number }> = { seojun: { x: 5, y: 5 }, hajun: { x: 7, y: 6 }, mom: { x: 8, y: 5 }, dad: { x: 4, y: 6 } };
     const sj = v.seojun;
     if (sj.inside && typeof sj.x === 'number' && typeof sj.y === 'number') homes.seojun = { x: sj.x, y: sj.y };
+    // 서로 같은 칸에 겹치지 않게 (지금 서 있는 칸 기억)
+    const at = new Map<string, string>();
     for (const [id, home] of Object.entries(homes)) {
       const p = lpcEl(base, id, size / 64);
       p.classList.add('vw-person');
       world.appendChild(p);
-      const place = (x: number, y: number) => { p.style.left = `${(x - box.x0 + 0.5) * tp - size / 2}px`; p.style.top = `${(y - box.y0 + 1) * tp - size * 0.92}px`; p.style.zIndex = String(12 + y); };
-      familyTimers.push(wander(p, place, home, id === 'seojun' && sj.inside ? 0 : 2, (x, y) => y < 4));
+      const place = (x: number, y: number) => { at.set(id, `${x},${y}`); p.style.left = `${(x - box.x0 + 0.5) * tp - size / 2}px`; p.style.top = `${(y - box.y0 + 1) * tp - size * 0.92}px`; p.style.zIndex = String(12 + y); };
+      familyTimers.push(wander(p, place, home, id === 'seojun' && sj.inside ? 0 : 2, (x, y) => y < 4 || [...at].some(([k, c]) => k !== id && c === `${x},${y}`)));
     }
   }
   el.replaceChildren(world);
