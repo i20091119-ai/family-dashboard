@@ -41,3 +41,4 @@
 
 GitHub 저장소 Secrets 의 `CLOUDFLARE_API_TOKEN` 칸에 토큰 글자 한 줄만 있어야 합니다(이름·설명·빈 줄 없이).
 열쇠를 바꾼 뒤에는 자동으로 다시 돌지 않으니, 새로 저장해서 올리거나 Actions 화면에서 "Re-run all jobs"를 누릅니다.
+토큰 권한(Cloudflare → Profile → API Tokens → Edit): All accounts · Workers Scripts Edit · D1 Edit · Account Settings Read.
