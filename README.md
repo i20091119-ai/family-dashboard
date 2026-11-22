@@ -36,3 +36,8 @@
 - 저장해서 GitHub에 올리면 `.github/workflows/deploy.yml`이 자동으로 올립니다. `main` = 진짜(`family-dashboard`), 그 밖 = 미리보기(`family-dashboard-preview`, 기록 저장소 따로).
   GitHub 저장소 Secrets에 `CLOUDFLARE_API_TOKEN`(포켓퀴즈와 같은 것)이 있어야 합니다.
 - 처음 열면 가족 접속 코드를 정하는 화면이 나옵니다(그 뒤로는 ⚙️에서 바꿈).
+
+## 올리기가 "Authorization header" 오류로 멈출 때
+
+GitHub 저장소 Secrets 의 `CLOUDFLARE_API_TOKEN` 칸에 토큰 글자 한 줄만 있어야 합니다(이름·설명·빈 줄 없이).
+열쇠를 바꾼 뒤에는 자동으로 다시 돌지 않으니, 새로 저장해서 올리거나 Actions 화면에서 "Re-run all jobs"를 누릅니다.
