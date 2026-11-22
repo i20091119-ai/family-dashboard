@@ -49,6 +49,17 @@ jobs:
           # 토큰을 만든 Cloudflare 계정 번호가 curl 시험 명령에 들어 있으면 그 계정에 올림
           acct=$(printf '%s' "$raw" | grep -oE 'accounts/[0-9a-f]{32}' | head -1 | sed 's#accounts/##')
           cfg=$(grep -oE '"account_id": *"[0-9a-f]{32}"' wrangler.jsonc | grep -oE '[0-9a-f]{32}')
+          # 이 토큰으로 들어갈 수 있는 계정 확인 (번호만, 이름·메일은 안 보임)
+          curl -s -H "Authorization: Bearer $tok" https://api.cloudflare.com/client/v4/user/tokens/verify > uv.json || true
+          curl -s -H "Authorization: Bearer $tok" "https://api.cloudflare.com/client/v4/accounts?per_page=50" > accts.json || true
+          node -e '
+            const cfg=process.argv[1]; let v={},a={};
+            try{v=require("./uv.json")}catch(e){} try{a=require("./accts.json")}catch(e){}
+            console.log("토큰 상태:", v.result&&v.result.status, JSON.stringify(v.errors||[]));
+            const ids=(a.result||[]).map(x=>x.id);
+            console.log("토큰으로 보이는 계정 수:", ids.length, "포켓퀴즈 계정 포함:", ids.includes(cfg), JSON.stringify(a.errors||[]));
+            if(ids.length===1&&ids[0]!==cfg) require("fs").appendFileSync(process.env.GITHUB_ENV,"CF_ACCOUNT="+ids[0]+"\n");
+          ' "$cfg"
           if [ -n "$acct" ]; then
             if [ "$acct" = "$cfg" ]; then echo "토큰 계정 = 포켓퀴즈와 같은 계정"; else echo "::warning::토큰이 포켓퀴즈와 다른 Cloudflare 계정에서 만들어졌어요. 그 계정에 올립니다."; echo "CF_ACCOUNT=$acct" >> "$GITHUB_ENV"; fi
             code=$(curl -s -o verify.json -w '%{http_code}' -H "Authorization: Bearer $tok" "https://api.cloudflare.com/client/v4/accounts/$acct/tokens/verify" || true)
