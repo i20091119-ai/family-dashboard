@@ -45,7 +45,15 @@ jobs:
           [ -n "$tok" ] || tok=$(printf '%s' "$raw" | tr -d '[:space:]')
           echo "::add-mask::$tok"
           echo "CLOUDFLARE_API_TOKEN=$tok" >> "$GITHUB_ENV"
-          echo "열쇠 칸: ${lines}줄, 고른 토큰 길이 ${#tok}자 (보통 40자)"
+          echo "열쇠 칸: ${lines}줄, 고른 토큰 길이 ${#tok}자"
+          # 토큰을 만든 Cloudflare 계정 번호가 curl 시험 명령에 들어 있으면 그 계정에 올림
+          acct=$(printf '%s' "$raw" | grep -oE 'accounts/[0-9a-f]{32}' | head -1 | sed 's#accounts/##')
+          cfg=$(grep -oE '"account_id": *"[0-9a-f]{32}"' wrangler.jsonc | grep -oE '[0-9a-f]{32}')
+          if [ -n "$acct" ]; then
+            if [ "$acct" = "$cfg" ]; then echo "토큰 계정 = 포켓퀴즈와 같은 계정"; else echo "::warning::토큰이 포켓퀴즈와 다른 Cloudflare 계정에서 만들어졌어요. 그 계정에 올립니다."; echo "CF_ACCOUNT=$acct" >> "$GITHUB_ENV"; fi
+            code=$(curl -s -o verify.json -w '%{http_code}' -H "Authorization: Bearer $tok" "https://api.cloudflare.com/client/v4/accounts/$acct/tokens/verify" || true)
+            echo "토큰 확인 결과: HTTP $code $(node -e 'try{const j=require("./verify.json");console.log(j.success, j.result&&j.result.status, JSON.stringify(j.errors))}catch(e){}')"
+          fi
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::warning::CLOUDFLARE_API_TOKEN 이 아직 없어서 인터넷에 올리지 않았어요."
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -62,6 +70,7 @@ jobs:
             echo "worker=family-dashboard-preview" >> "$GITHUB_OUTPUT"; echo "db=family-dashboard-preview-db" >> "$GITHUB_OUTPUT"
             sed -i 's/"name": "family-dashboard"/"name": "family-dashboard-preview"/; s/"database_name": "family-dashboard-db"/"database_name": "family-dashboard-preview-db"/' wrangler.jsonc
           fi
+          if [ -n "$CF_ACCOUNT" ]; then sed -i "s/\"account_id\": *\"[0-9a-f]*\"/\"account_id\": \"$CF_ACCOUNT\"/" wrangler.jsonc; fi
           grep -n '"name"\|database_name' wrangler.jsonc
 
       - name: 기록 저장소 준비 (없으면 만들고 번호 채우기)
